@@ -1,42 +1,58 @@
-import re
 import unicodedata
+import re
 from minio import Minio
+from sentence_transformers import SentenceTransformer
+
 
 def limpar_texto(texto):
-    # 1) Padroniza os acentos (forma NFC do Unicode)
     texto = unicodedata.normalize("NFC", texto)
-
-    # 2) Remove caracteres de controle invisiveis (mantem quebra de linha e tab)
-    #texto = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", texto)
     limpo = ""
     for ch in texto:
         if ch in "\t\n" or not unicodedata.category(ch).startswith("C"):
             limpo += ch
     texto = limpo
-
-    # 3) Tira os espacos sobrando no fim de cada linha
     linhas_limpas = []
     for linha in texto.splitlines():
         linhas_limpas.append(linha.rstrip())
     texto = "\n".join(linhas_limpas)
-
-    # 4) Onde houver 3 ou mais linhas em branco seguidas, deixa so uma
     texto = re.sub(r"\n{3,}", "\n\n", texto)
-
-    # 5) Tira espacos em branco no comeco e no fim de tudo
     texto = texto.strip()
-
     return texto
 
-# ---- Conectar ao MinIO ----
-client = Minio(
-    "localhost:9000",
-    access_key="rafa",       # use o MESMO usuario do docker-compose.yml
-    secret_key="orion2026",  # use a MESMA senha do docker-compose.yml
-    secure=False,            # False porque e local (http, nao https)
-)
 
-# ---- Listar os arquivos do bucket ----
+def fazer_chunks(texto, tamanho=1200, overlap=200):
+    chunks = []
+    inicio = 0
+    while inicio < len(texto):
+        fim = inicio + tamanho
+        chunks.append(texto[inicio:fim])
+        inicio = inicio + tamanho - overlap
+    return chunks
+
+
+print("Carregando o modelo BGE-M3...")
+modelo = SentenceTransformer("BAAI/bge-m3", device="cpu")
+
+client = Minio("localhost:9000", access_key="rafa", secret_key="orion2026", secure=False)
 bucket = "dados-brutos"
+
+todos_os_chunks = []
 for obj in client.list_objects(bucket, recursive=True):
-    print(obj.object_name)
+    nome = obj.object_name
+    resposta = client.get_object(bucket, nome)
+    conteudo = resposta.read().decode("utf-8", errors="ignore")
+    resposta.close()
+    resposta.release_conn()
+    texto_limpo = limpar_texto(conteudo)
+    chunks = fazer_chunks(texto_limpo)
+    todos_os_chunks = todos_os_chunks + chunks
+    print(f"{nome}  ({len(texto_limpo)} caracteres -> {len(chunks)} chunks)")
+
+print()
+print(f"Total de chunks: {len(todos_os_chunks)}")
+
+print("Vetorizando todos os chunks (pode levar um tempinho no processador)...")
+vetores = modelo.encode(todos_os_chunks, show_progress_bar=True)
+
+print(f"Pronto! Foram gerados {len(vetores)} vetores.")
+print(f"Cada vetor tem {len(vetores[0])} numeros.")
