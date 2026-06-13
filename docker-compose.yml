@@ -38,16 +38,24 @@ services:
     container_name: app
     depends_on:
       - minio
+      - postgres
+      - qdrant
     environment:
       MINIO_HOST: minio:9000
       MINIO_KEY: rafa
       MINIO_SECRET: orion2026
       MINIO_BUCKET: dados-brutos
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: rafa
+      POSTGRES_PASSWORD: orion2026
+      POSTGRES_DB: orion
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
     volumes:
-      - hf-cache:/root/.cache/huggingface
+      - /home/rafa/.cache/huggingface:/root/.cache/huggingface
 
 volumes:
   minio-data:
   postgres-data:
   qdrant-data:
-  hf-cache:

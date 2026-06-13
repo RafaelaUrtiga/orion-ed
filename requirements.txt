@@ -1,3 +1,5 @@
 pypdf
 minio
 sentence-transformers
+psycopg[binary]
+qdrant-client
