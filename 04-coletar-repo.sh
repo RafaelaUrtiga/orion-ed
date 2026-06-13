@@ -1,36 +1,30 @@
 #!/bin/bash
 # 04-coletar-repo.sh
 
-# 1) Clonar o repositório (só se ainda não existir)
-if [ ! -d ./prompts ]; then
-  git clone https://github.com/sandeco/prompts
-fi
+source .env
 
-# 2) Configurações fixas do MinIO
-host="localhost:9000"
-chave="rafa"
-segredo="orion2026"
-bucket="dados-brutos"
-tipo="text/plain"
+TIPO="application/pdf"
 
-# 3) Achar todos os .txt
-FILES=$(find ./prompts -type f -name "*.txt")
+# Espera o MinIO ficar pronto (mata o erro curl 7/56 de uma vez)
+echo "Aguardando o MinIO ficar pronto..."
+until curl -s -o /dev/null "http://${MINIO_HOST}/minio/health/live"; do
+  sleep 1
+done
+echo "MinIO pronto."
 
-# 4) Cortar só por quebra de linha (e não por espaço)
+FILES=$(find ./pdfs -type f -name "*.pdf")
 IFS=$'\n'
-
-# 5) Enviar cada arquivo
-for file in $FILES; do
-  arquivo="$file"
-  objeto=$(echo "${file#./}" | tr ' ' '_')
-  recurso="/${bucket}/${objeto}"
-  data=$(date -R)
-  assinar="PUT\n\n${tipo}\n${data}\n${recurso}"
-  assinatura=$(echo -en "${assinar}" | openssl sha1 -hmac "${segredo}" -binary | base64)
-  curl -sS -X PUT -T "${arquivo}" \
-    -H "Host: ${host}" -H "Date: ${data}" \
-    -H "Content-Type: ${tipo}" \
-    -H "Authorization: AWS ${chave}:${assinatura}" \
-    "http://${host}${recurso}"
-  echo "Enviado: ${objeto}"
+for FILE in $FILES; do
+  OBJETO=$(echo "${FILE#./}" | tr ' ' '_')
+  RECURSO="/${MINIO_BUCKET}/${OBJETO}"
+  DATA=$(date -R)
+  ASSINAR="PUT\n\n${TIPO}\n${DATA}\n${RECURSO}"
+  ASSINATURA=$(echo -en "${ASSINAR}" | openssl sha1 -hmac "${MINIO_SECRET}" -binary | base64)
+  curl -X PUT -T "${FILE}" \
+    -H "Host: ${MINIO_HOST}" \
+    -H "Date: ${DATA}" \
+    -H "Content-Type: ${TIPO}" \
+    -H "Authorization: AWS ${MINIO_KEY}:${ASSINATURA}" \
+    "http://${MINIO_HOST}${RECURSO}"
+  echo "Enviado: ${OBJETO}"
 done

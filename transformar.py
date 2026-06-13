@@ -1,7 +1,19 @@
+import io
+import os
+import time
 import unicodedata
 import re
+from pypdf import PdfReader
 from minio import Minio
 from sentence_transformers import SentenceTransformer
+
+
+def extrair_texto_pdf(dados):
+    leitor = PdfReader(io.BytesIO(dados))
+    partes = []
+    for pagina in leitor.pages:
+        partes.append(pagina.extract_text() or "")
+    return "\n".join(partes)
 
 
 def limpar_texto(texto):
@@ -33,17 +45,32 @@ def fazer_chunks(texto, tamanho=1200, overlap=200):
 print("Carregando o modelo BGE-M3...")
 modelo = SentenceTransformer("BAAI/bge-m3", device="cpu")
 
-client = Minio("localhost:9000", access_key="rafa", secret_key="orion2026", secure=False)
-bucket = "dados-brutos"
+host = os.environ.get("MINIO_HOST", "localhost:9000")
+chave = os.environ.get("MINIO_KEY", "rafa")
+segredo = os.environ.get("MINIO_SECRET", "orion2026")
+bucket = os.environ.get("MINIO_BUCKET", "dados-brutos")
+
+client = Minio(host, access_key=chave, secret_key=segredo, secure=False)
+
+print("Aguardando o MinIO...")
+while True:
+    try:
+        client.bucket_exists(bucket)
+        break
+    except Exception:
+        time.sleep(1)
+print("MinIO pronto.")
 
 todos_os_chunks = []
 for obj in client.list_objects(bucket, recursive=True):
     nome = obj.object_name
     resposta = client.get_object(bucket, nome)
-    conteudo = resposta.read().decode("utf-8", errors="ignore")
+    dados = resposta.read()
     resposta.close()
     resposta.release_conn()
-    texto_limpo = limpar_texto(conteudo)
+
+    texto = extrair_texto_pdf(dados)
+    texto_limpo = limpar_texto(texto)
     chunks = fazer_chunks(texto_limpo)
     todos_os_chunks = todos_os_chunks + chunks
     print(f"{nome}  ({len(texto_limpo)} caracteres -> {len(chunks)} chunks)")
