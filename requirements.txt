@@ -1,5 +1,9 @@
 pypdf
-minio
 sentence-transformers
 psycopg[binary]
 qdrant-client
+fastapi
+uvicorn[standard]
+python-multipart
+requests
+beautifulsoup4

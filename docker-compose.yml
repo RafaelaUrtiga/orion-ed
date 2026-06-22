@@ -40,6 +40,8 @@ services:
       - minio
       - postgres
       - qdrant
+    ports:
+      - "8000:8000"
     environment:
       MINIO_HOST: minio:9000
       MINIO_KEY: rafa
