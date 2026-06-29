@@ -1,0 +1,19 @@
+# Cache e lixo do Python
+__pycache__/
+*.pyc
+
+# Ambientes virtuais
+.venv/
+venv/
+
+# o Cofre: NUNCA vai pro Git
+.env
+.env.*
+!.env.example
+
+# Editores
+.vscode/
+.idea/
+
+# Logs
+*.log

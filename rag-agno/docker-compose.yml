@@ -1,0 +1,37 @@
+services:
+  postgres-rag:
+    image: postgres:15
+    container_name: postgres-rag
+    environment:
+      POSTGRES_USER: rafa
+      POSTGRES_PASSWORD: orion2026
+      POSTGRES_DB: orion
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-rag-data:/var/lib/postgresql/data
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  agno-agent:
+    build:
+      context: agno-rag
+      dockerfile: Dockerfile
+    container_name: agno_rag_agent
+    ports:
+      - "8008:8008"
+    env_file:
+      - agno-rag/.env
+    depends_on:
+      - postgres-rag
+      - qdrant
+
+volumes:
+  postgres-rag-data:
+  qdrant-data:
